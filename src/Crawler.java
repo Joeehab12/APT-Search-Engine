@@ -19,7 +19,7 @@ public class Crawler {
 	// The set of links that were visited, used to avoid visiting the same link twice.
 	private Set<String> visitedUrls = new HashSet<String>();
 	// Limit where crawler will stop crawling otherwise it will crawl infinitely
-	private int maxPageLimit = 20;
+	private int maxPageLimit = 3;
 	// User Agent to make web crawler conform to robot exclusion standard.
 	private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 6.1; WOW64)"
@@ -35,7 +35,7 @@ public class Crawler {
 		while(visitedUrls.contains(next)){ // loops until it finds a link that it didn't visit before
 			next = urlsToVisit.remove(0);
 		}	
-		visitedUrls.add(next);  // then it marks this link as visited.
+		//visitedUrls.add(next);  // then it marks this link as visited.
 		return next;
 	}
 
@@ -66,7 +66,7 @@ public class Crawler {
 			System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
 			for (Element link : URLs){
 				urlsToVisit.add(link.attr("abs:href")); // Add each hyper-link to the links to visit list.
-				System.out.println(String.format("Link %d: %s",fileNum,link.attr("abs:href")));
+			System.out.println(String.format("Link %d: %s",fileNum,link.attr("abs:href")));
 				fileNum++;
 			}
 			
@@ -85,7 +85,7 @@ public class Crawler {
 	public void searchLoop(String Url){
 		String currentUrl = Url;	
 		int fileNum = 0;
-		while(visitedUrls.size() <= maxPageLimit){	// loop to add given link to list of pages to be visited. find its hyper-links and mark it as visited and so on.
+		while(visitedUrls.size() < maxPageLimit){	// loop to add given link to list of pages to be visited. find its hyper-links and mark it as visited and so on.
 			urlsToVisit.add(currentUrl);
 			crawl(currentUrl,fileNum);
 			visitedUrls.add(currentUrl);
