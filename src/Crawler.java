@@ -6,36 +6,54 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.apache.commons.io.FileUtils;
+/**
+ * Crawler.java
+ * Purpose: Fetches Urls in web pages starting from a URL seed.
+ *
+ * @author Abdallah Sobehy, Mostafa Fateen, Youssef Ehab
+ * @version 1.0 5/3/2017
+ */
 public class Crawler {
-	private List<String> urlstoVisit = new LinkedList<String>(); 
 	// A list of links to be visited
-	private Set<String> visitedUrls = new HashSet<String>(); 
-	// The set of links that are visited
-	// (It's a set to avoid visiting the same link twice.
-	private int max_page_limit = 20;
+	private List<String> urlsToVisit = new LinkedList<String>();
+	// The set of links that were visited, used to avoid visiting the same link twice.
+	private Set<String> visitedUrls = new HashSet<String>();
 	// Limit where crawler will stop crawling otherwise it will crawl infinitely
+	private int maxPageLimit = 20;
 	// User Agent to make web crawler conform to robot exclusion standard.
 	private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 6.1; WOW64)"
             + " AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.112 Safari/535.1";
-	// nextUrl:Function that works out which link to visit next
+
+	/**
+	 * Chooses which link to visit next
+	 *
+	 * @return next URL to visit
+	 */
 	public String nextUrl(){
-		String next = urlstoVisit.remove(0); // checks the first link in the (links to visit) list
+		String next = urlsToVisit.remove(0); // checks the first link in the (links to visit) list
 		while(visitedUrls.contains(next)){ // loops until it finds a link that it didn't visit before
-			next = urlstoVisit.remove(0); 
+			next = urlsToVisit.remove(0);
 		}	
 		visitedUrls.add(next);  // then it marks this link as visited.
 		return next;
 	}
-	// crawl:Function that takes as input a link and downloads all the hyper-links found in that link.
-	public boolean crawl(String URL, int pagenum){
+
+	/**
+	 *  takes as input a link and downloads all the hyper-links found in that link.
+	 *
+	 * @param URL input link to investigate for links
+	 * @param pageNum a number given to the input webpage
+	 * @return
+	 */
+	public boolean crawl(String URL, int pageNum){
 		try{
-			Connection con = Jsoup.connect(URL).userAgent(USER_AGENT); 
 			// Jsoup acquires connection to given URL
-			Document htmlDocument = con.get();	
-			//gets the Document and parses it 
+			Connection con = Jsoup.connect(URL).userAgent(USER_AGENT);
+			//gets the Document and parses it
+			Document htmlDocument = con.get();
 			if (con.response().contentType().contains("text/html")){ // check if document is HTML or not
-				final File f = new File("page" + pagenum + ".html");
+				final File f = new File("page" + pageNum + ".html");
 		        FileUtils.writeStringToFile(f, htmlDocument.outerHtml(), "UTF-8");
 			}
 			if(!con.response().contentType().contains("text/html")){
@@ -44,12 +62,12 @@ public class Crawler {
 			}
 			Elements URLs = htmlDocument.select("a[href]");  
 			// get all hyper-links found on the given URL.
-			int file_num = 0;
+			int fileNum = 0;
 			System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
 			for (Element link : URLs){
-				urlstoVisit.add(link.attr("abs:href")); // Add each hyper-link to the links to visit list.
-				System.out.println(String.format("Link %d: %s",file_num,link.attr("abs:href")));
-				file_num++;
+				urlsToVisit.add(link.attr("abs:href")); // Add each hyper-link to the links to visit list.
+				System.out.println(String.format("Link %d: %s",fileNum,link.attr("abs:href")));
+				fileNum++;
 			}
 			
 			return true;
@@ -58,21 +76,25 @@ public class Crawler {
 			return true;
 		}
 	}
-	//search_loop: Function that starts with a link, crawls and gets it's hyper-links and repeats the same process -
-	// for each hyper-link until the maximum page limit is reached.
-	public void search_loop(String Url){
+	/**
+	 * starts with a link, crawls and gets included hyper-links and repeats the same process
+	 * for each hyper-link until the maximum page limit is reached.
+	 *
+	 * @param Url URL seed to start fetching from
+	 */
+	public void searchLoop(String Url){
 		String currentUrl = Url;	
-		int file_num = 0;
-		while(visitedUrls.size() <= max_page_limit){	// loop to add given link to list of pages to be visited. find its hyper-links and mark it as visited and so on.
-			urlstoVisit.add(currentUrl);
-			crawl(currentUrl,file_num);
+		int fileNum = 0;
+		while(visitedUrls.size() <= maxPageLimit){	// loop to add given link to list of pages to be visited. find its hyper-links and mark it as visited and so on.
+			urlsToVisit.add(currentUrl);
+			crawl(currentUrl,fileNum);
 			visitedUrls.add(currentUrl);
 			currentUrl = nextUrl();
-			file_num++;
+			fileNum++;
 		}
 	}
 	public static void main(String[] args){
 		Crawler c = new Crawler();
-		c.search_loop("https://www.wikipedia.org");	
+		c.searchLoop("https://www.wikipedia.org");
 	}
 }
