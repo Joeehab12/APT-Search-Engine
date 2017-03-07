@@ -66,14 +66,16 @@ public class Crawler {
 			System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
 			for (Element link : URLs){
 				urlsToVisit.add(link.attr("abs:href")); // Add each hyper-link to the links to visit list.
-			System.out.println(String.format("Link %d: %s",fileNum,link.attr("abs:href")));
+				if(fileNum < 2){
+					System.out.println(String.format("Link %d: %s",fileNum,link.attr("abs:href")));
+				}
 				fileNum++;
 			}
 			
 			return true;
 		}
 		catch(Exception e){
-			return true;
+			return false;
 		}
 	}
 	/**
