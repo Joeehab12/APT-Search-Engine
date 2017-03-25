@@ -1,7 +1,8 @@
-/bin/
+bin/
+.idea/
+out/
 
-\.classpath
-
-\.project
-
+.classpath
+.project
 *.html
+/APT-Search-Engine.iml
