@@ -12,9 +12,9 @@ This repository will contain all APT project files and any updates will be commi
     - [x] Some web administrators choose to exclude some pages from the search such as their web pages.
     - [ ] Frequency of crawling is an important part of a web crawler. Some sites will be visited more often than
           others. You may set some criteria to the sites.
-    - [ ] Provide a multithreaded crawler implementation where the user can control the number of threads
+    - [x] Provide a multithreaded crawler implementation where the user can control the number of threads
           before starting the crawler.
-    - [x] Implement a web crawler that conforms to robot exclusion standard.
+    - [ ] Implement a web crawler that conforms to robot exclusion standard.
     - [x] Take Care of the choice of your seeds and the stopping criteria.
     
 ## Milestone 2 (Indexer):
