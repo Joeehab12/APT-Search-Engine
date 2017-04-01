@@ -1,14 +1,14 @@
-import java.util.*;
-import java.io.*;
+import org.apache.commons.io.FileUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import opennlp.tools.stemmer.snowball.*;
-import opennlp.tools.stemmer.snowball.SnowballStemmer.ALGORITHM;
 
-import org.apache.commons.io.FileUtils;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.util.*;
 /**
  * Crawler.java
  * Purpose: Fetches Urls in web pages starting from a URL seed.

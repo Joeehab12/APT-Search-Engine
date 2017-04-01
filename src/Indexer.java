@@ -1,13 +1,11 @@
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
+import opennlp.tools.stemmer.snowball.SnowballStemmer;
+import opennlp.tools.stemmer.snowball.SnowballStemmer.ALGORITHM;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import opennlp.tools.stemmer.snowball.*;
+
 import java.util.StringTokenizer;
 import java.util.Vector;
-import opennlp.tools.stemmer.snowball.SnowballStemmer.ALGORITHM;
-import org.apache.commons.io.FileUtils;
 
 public class Indexer {
 	

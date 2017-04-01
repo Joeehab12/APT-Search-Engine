@@ -6,3 +6,4 @@ out/
 .project
 *.html
 /APT-Search-Engine.iml
+/src/Test.java
