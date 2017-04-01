@@ -1,20 +1,36 @@
-import org.apache.commons.io.FileUtils;
+import java.util.*;
+import java.io.*;
+import crawlercommons.robots.*;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.*;
+import org.apache.commons.io.FileUtils;
+import java.net.URL;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.util.EntityUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.protocol.BasicHttpContext;
+import crawlercommons.robots.SimpleRobotRules.RobotRulesMode;
+import org.apache.http.entity.BufferedHttpEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+
 /**
  * Crawler.java
  * Purpose: Fetches Urls in web pages starting from a URL seed.
  *
  * @author Abdallah Sobehy, Mostafa Fateen, Youssef Ehab
  * @version 1.0 5/3/2017
+ * @ref http://stackoverflow.com/questions/19332982/parsing-robot-txt-using-java-and-identify-whether-an-url-is-allowed
+ * @ref https://code.google.com/archive/p/crawler-commons/source/default/source
  */
 
 
@@ -23,16 +39,18 @@ import java.util.*;
 public class Crawler implements Runnable{
 	// A list of links to be visited
 	private List<String> urlsToVisit = new LinkedList<String>();
-	
+
 	private static Vector<Map<String,Vector<String>>> paragraphsMap = new Vector<Map<String,Vector<String>>>();
 	
 	private static Vector<Map<String,Vector<String>>> headersMap = new Vector<Map<String,Vector<String>>>();
 
 	private static Vector<Map<String,Vector<String>>> titlesMap = new Vector<Map<String,Vector<String>>>();
-	
+
+	private static Vector<Map<String,Vector<String>>> urlsMap = new Vector<Map<String,Vector<String>>>();
+
 	// The set of links that were visited, used to avoid visiting the same link twice.
 	private static Set<String> visitedUrls = new HashSet<String>();
-	
+
 	// Limit where crawler will stop crawling otherwise it will crawl infinitely
 	private int maxPageLimit;
 	// Seed from which other links are extracted
@@ -47,6 +65,7 @@ public class Crawler implements Runnable{
 		this.maxPageLimit = maxPages;
 		this.visitedUrls = visitedUrls;
 	}
+
 
 	/**
 	 * run method for crawing threads
@@ -109,6 +128,43 @@ public class Crawler implements Runnable{
 	}
 
 	/**
+	 * Returns true if the site allows crawler to access it to
+	 * adhere to robot's exclusion standard
+	 */
+	private static boolean isRobotAllowed(String USER_AGENT,String url ) throws Exception
+	{
+		try {
+			URL urlObj = new URL(url);
+			String hostId = urlObj.getProtocol() + "://" + urlObj.getHost()
+					+ (urlObj.getPort() > -1 ? ":" + urlObj.getPort() : "");
+			Map<String, BaseRobotRules> robotsTxtRules = new HashMap<String, BaseRobotRules>();
+			BaseRobotRules rules = robotsTxtRules.get(hostId);
+			if (rules == null) {
+				CloseableHttpClient httpclient = HttpClients.createDefault();
+				HttpGet httpget = new HttpGet(hostId + "/robots.txt");
+				HttpContext context = new BasicHttpContext();
+				HttpResponse response = httpclient.execute(httpget, context);
+				if (response.getStatusLine() != null && response.getStatusLine().getStatusCode() == 404) {
+					rules = new SimpleRobotRules(RobotRulesMode.ALLOW_ALL);
+					// consume entity to deallocate connection
+					EntityUtils.consumeQuietly(response.getEntity());
+				} else {
+					BufferedHttpEntity entity = new BufferedHttpEntity(response.getEntity());
+					SimpleRobotRulesParser robotParser = new SimpleRobotRulesParser();
+					rules = robotParser.parseContent(hostId, IOUtils.toByteArray(entity.getContent()),
+							"text/plain", USER_AGENT);
+				}
+				robotsTxtRules.put(hostId, rules);
+			}
+			return rules.isAllowed(url);
+		}catch(Exception e)
+		{
+			System.out.println("isRobotAllowed Exception: " + e.toString());
+			return false;
+		}
+	}
+
+	/**
 	 * Checks if it possible to fetch the input url for other links
 	 * @param url input url to be tested
 	 * @return
@@ -139,7 +195,12 @@ public class Crawler implements Runnable{
 	 */
 	public boolean crawl(String URL, int pageNum){
 		try{
-
+			// Check for webpage allowance for robots
+			if(!isRobotAllowed(USER_AGENT,URL))
+			{
+				System.out.println("The url : " + URL + "is not allowed to be fetched by robots");
+				return false;
+			}
 			// Jsoup acquires connection to given URL
 			Connection con = Jsoup.connect(URL).userAgent(USER_AGENT);
 			//gets the Document and parses it
@@ -153,67 +214,19 @@ public class Crawler implements Runnable{
 				return false;
 			}
 			Elements URLs = htmlDocument.select("a[href]");
-			System.out.println("This is location:" + htmlDocument.location());
-			/*
-			StringTokenizer st;
-			String delimiters = "[ \n\r.,_(){}-?!|&$\"+*-/\t]";
-			String title = htmlDocument.select("title").text();
-			Vector<String> titleKeywords = new Vector<String>(0);
-			st = new StringTokenizer(title,delimiters,false);
-			
-			while(st.hasMoreTokens()){
-				String s = st.nextToken();
-				if (s!= "" && s!= " "){
-				titleKeywords.add(s);
-				}
-			}
-			
-			
-			Elements headers = htmlDocument.select("h1,h2,h3,h4,h5,h6");
-			
-			Elements paragraphs = htmlDocument.select("p");
-			
-			Map <String,Vector<String>> urlMap;
-			Vector<String> totalKeywords = new Vector<String>(0);
-			totalKeywords.addAll(titleKeywords);
-			Vector<String> headerKeywords = new Vector<String>(0);
-			Vector<String> paragraphKeywords = new Vector<String>(0);
-			for (Element header : headers){
-				String headerText = header.text();
-				st = new StringTokenizer(headerText,delimiters,false);
-				while(st.hasMoreTokens()){
-					String s = st.nextToken();
-					if (s!= "" && s!= " "){
-					headerKeywords.add(s);
-					}
-				}
-			}
-			
-			for (Element paragraph : paragraphs){
-				String paragraphText = paragraph.text();
-				st = new StringTokenizer(paragraphText,delimiters,false);
-				while(st.hasMoreTokens()){
-					String s = st.nextToken();
-					if (s!= "" && s!= " "){
-					paragraphKeywords.add(s);
-					}
-				}
-			}
-			totalKeywords.addAll(headerKeywords);
-			totalKeywords.addAll(paragraphKeywords);
-			*/
+
 			// get all hyper-links found on the given URL.
 			int fileNum = 0;
 			//System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
+			String childUrl;
 			for (Element link : URLs){
-				if(!link.attr("abs:href").equals("")){ // making sure it is not an empty string
+				childUrl = link.attr("abs:href");
+				if(!childUrl.equals("")){ // making sure it is not an empty string
 					urlsToVisit.add(link.attr("abs:href"));
-					
 				}// Add each hyper-link to the links to visit list.
 				
 				fileNum++;
 			}
-			
 			Vector<String> titleKeywords = Indexer.getTitleKeywords(htmlDocument);
 			Vector<String> paragraphKeywords = Indexer.getParagraphKeywords(htmlDocument);
 			Vector<String> headerKeywords = Indexer.getHeaderKeywords(htmlDocument);
@@ -230,7 +243,7 @@ public class Crawler implements Runnable{
 			Map<String,Vector<String>> headerMap = new HashMap<String, Vector<String>>(0);
 			headerMap.put(URL, headerKeywords);
 			headersMap.add(headerMap);
-			
+
 			return true;
 		}
 		catch(Exception e){
@@ -248,10 +261,7 @@ public class Crawler implements Runnable{
 		}
 	}
 	*/
-	
-	
-	
-	
+
 	/**
 	 * starts with a link, crawls and gets included hyper-links and repeats the same process
 	 * for each hyper-link until the maximum page limit is reached.
@@ -268,6 +278,7 @@ public class Crawler implements Runnable{
 				if(visitedUrls.size() < maxPageLimit)
 					visitedUrls.add(currentUrl);
 			}
+
 			currentUrl = nextUrl();
 			fileNum++;
 		}
@@ -294,46 +305,6 @@ public class Crawler implements Runnable{
 		for(String url : visitedUrls) {
 			System.out.println(count++ + "- " + url);
 		}
-		Vector<String> urlKeywords = new Vector<String>();
-		
-		int index1 = 0;
-		int index2 = 0;
-		
-		
-		for (Map <String,Vector<String>> mp: titlesMap){
-			urlKeywords = mp.get(threadsSeeds.get(index1));
-			for (String keyword: urlKeywords){
-				//System.out.println("Title " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
-				index2++;
-			}
-			index2 = 0;
-			index1++;
-		}
-		
-		
-		index1 =0;
-		index2 = 0;
-		
-		for (Map <String,Vector<String>> mp: headersMap){
-			urlKeywords = mp.get(threadsSeeds.get(index1));
-			for (String keyword: urlKeywords){
-				System.out.println("Header " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
-				index2++;
-			}
-			index2 = 0;
-			index1++;
-		}
-		index1 = 0;
-		index2 = 0;
-		for (Map <String,Vector<String>> mp: paragraphsMap){
-			urlKeywords = mp.get(threadsSeeds.get(index1));
-			for (String keyword: urlKeywords){
-				//System.out.println("Paragraph " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
-				index2++;
-			}
-			index2 = 0;
-			index1++;
-		}
-		
+
 	}
 }
