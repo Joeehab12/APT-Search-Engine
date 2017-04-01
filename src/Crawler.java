@@ -38,15 +38,9 @@ import org.apache.http.impl.client.HttpClients;
 
 public class Crawler implements Runnable{
 	// A list of links to be visited
-	private static Vector<Map<String,Vector<String>>> paragraphsMap = new Vector<>();
-	
-	private static Vector<Map<String,Vector<String>>> headersMap = new Vector<>();
+	private Vector<String> titleKeywords, paragraphKeywords, headerKeywords;
 
-	private static Vector<Map<String,Vector<String>>> titlesMap = new Vector<>();
-
-
-	CrawlStatus crawlStatus = CrawlStatus.getInstance( );
-
+	private CrawlStatus crawlStatus = CrawlStatus.getInstance( );
 
 	// User Agent to make web crawler conform to robot exclusion standard.
 	private static final String USER_AGENT =
@@ -199,23 +193,10 @@ public class Crawler implements Runnable{
 					crawlStatus.addUrlToVisit(childUrl);
 				}// Add each hyper-link to the links to visit list.
 			}
-			Vector<String> titleKeywords = Indexer.getTitleKeywords(htmlDocument);
-			Vector<String> paragraphKeywords = Indexer.getParagraphKeywords(htmlDocument);
-			Vector<String> headerKeywords = Indexer.getHeaderKeywords(htmlDocument);
-			
-			
-			Map<String,Vector<String>> titleMap = new HashMap<>(0);
-			titleMap.put(URL, titleKeywords);
-			titlesMap.add(titleMap);
-			
-			Map<String,Vector<String>> paragraphMap = new HashMap<>(0);
-			paragraphMap.put(URL, paragraphKeywords);
-			paragraphsMap.add(paragraphMap);
-			
-			Map<String,Vector<String>> headerMap = new HashMap<>(0);
-			headerMap.put(URL, headerKeywords);
-			headersMap.add(headerMap);
 
+			titleKeywords = Indexer.getTitleKeywords(htmlDocument);
+			paragraphKeywords = Indexer.getParagraphKeywords(htmlDocument);
+			headerKeywords = Indexer.getHeaderKeywords(htmlDocument);
 			return true;
 		}
 		catch(Exception e){
@@ -232,8 +213,9 @@ public class Crawler implements Runnable{
 		String currentUrl;
 		while(!crawlStatus.stopCrawling()){	// loop to add given link to list of pages to be visited. find its hyper-links and mark it as visited and so on.
 			currentUrl = crawlStatus.getNextUrlToVisit();
-			crawl(currentUrl);
-			crawlStatus.addVisitedUrl(currentUrl);
+			if (crawl(currentUrl)) {
+				crawlStatus.addVisitedUrl(currentUrl, titleKeywords, headerKeywords, paragraphKeywords);
+			}
 		}
 	}
 }

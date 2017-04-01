@@ -4,6 +4,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.UpdateOptions;
 import org.bson.Document;
 
+import java.util.List;
 import java.util.Vector;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -22,11 +23,15 @@ public class VisitedUrl {
 
     private long id;
     private boolean persisted = false;
+    private List<String> titleKeywords, headerKeywords, paragraphKeywords;
 
-    VisitedUrl(String url) {
+    VisitedUrl(String url, List<String> titleKeywords, List<String>headerKeywords, List<String>paragraphKeywords) {
         this.frequency = 1;
         this.url = url;
         id = nextID ++;
+        this.titleKeywords = titleKeywords;
+        this.headerKeywords = headerKeywords;
+        this.paragraphKeywords = paragraphKeywords;
     }
 
     VisitedUrl(String url, long id, int frequency, boolean persisted) {
@@ -48,12 +53,12 @@ public class VisitedUrl {
 
     public void setPersisted() { this.persisted = true; }
 
-    private void persistURL(Vector<String> paragraphs, Vector<String> headers, Vector<String> title){
+    public void persistURL(){
         MongoClient mongoClient = new MongoClient();
         MongoDatabase database = mongoClient.getDatabase("APT_Search_Engine");
         MongoCollection<Document> collection = database.getCollection("Index");
 
-        Document page = new Document("URL", this.url).append("Title", title).append("Headers", headers).append("Paragraphs", paragraphs);
+        Document page = new Document("URL", this.url).append("Title", titleKeywords).append("Headers", headerKeywords).append("Paragraphs", paragraphKeywords);
 
         collection.updateOne(eq("URL", this.url), new Document("$set", page), new UpdateOptions().upsert(true));
     }
