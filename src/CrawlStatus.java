@@ -1,8 +1,11 @@
+import com.mongodb.Block;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.UpdateOptions;
 import org.bson.Document;
+import static com.mongodb.client.model.Updates.*;
+
 
 import java.util.*;
 
@@ -14,33 +17,64 @@ public class CrawlStatus {
 
 	private static List<String> urlsToVisit;
 	private static Map<String, VisitedUrl> visitedUrls;
+	private static Map<String, Keyword> keywords;
 	private MongoCollection<Document> collection;
+	MongoDatabase database;
+	private int maxPageLimit;
 
 	private CrawlStatus() {
 		urlsToVisit = new LinkedList<>();
 		visitedUrls = new HashMap<>();
+		keywords = new HashMap<>();
 
 		MongoClient mongoClient = new MongoClient();
-		MongoDatabase database = mongoClient.getDatabase("test");
-		collection = database.getCollection("test");
+		database = mongoClient.getDatabase("APT_Search_Engine");
 	}
 
 	public static CrawlStatus getInstance() {
 		return singleton;
 	}
 
-	public void addVisitedUrl(String url) {
-		VisitedUrl tmp = visitedUrls.get(url);
-
-		if (tmp == null) {
-			tmp = new VisitedUrl(url);
-			visitedUrls.put(url, tmp);
-		} else tmp.increment();
-
+	public int getMaxPageLimit() {
+		return maxPageLimit;
 	}
 
-	public void addUrlToVisit(String url) {
-		urlsToVisit.add(url);
+	public void setMaxPageLimit(int maxPageLimit) {
+		this.maxPageLimit = maxPageLimit;
+	}
+
+	synchronized public void addVisitedUrl(String url) {
+		VisitedUrl tmpUrl = visitedUrls.get(url);
+
+		if (tmpUrl == null) {
+			visitedUrls.put(url, new VisitedUrl(url));
+		} else tmpUrl.increment();
+	}
+
+	synchronized public void addKeyword(String word, String url, int position) {
+		Keyword tmpKeyword = keywords.get(word);
+
+		if (tmpKeyword == null) {
+			keywords.put(word, new Keyword(word, url, position));
+		} else tmpKeyword.addReference(url, position);
+	}
+
+	public void addVisitedUrl (Set<String> visitedUrls){
+		for (String visitedUrl : visitedUrls) {
+			addVisitedUrl(visitedUrl);
+		}
+	}
+
+	synchronized public void addUrlToVisit(String url) {
+		VisitedUrl tmp = visitedUrls.get(url);
+		if (tmp == null)
+			urlsToVisit.add(url);
+		else
+			tmp.increment();
+	}
+
+	synchronized public String getNextUrlToVisit() {
+		return urlsToVisit.remove(0);
 	}
 
 	public void print() {
@@ -52,85 +86,86 @@ public class CrawlStatus {
 	}
 
 	public void persistDB() {
-		Document visited = new Document();
-
+		List<Document> visitedDocs = new ArrayList<>();
+		List<Document> keywordDocs = new ArrayList<>();
+		Document toVisitDoc = new Document("URLs", urlsToVisit);
+		collection = database.getCollection("Crawl_Status");
 		String url;
 		int frequency;
+		long id;
+		VisitedUrl visitedUrlObj;
 		for (Object o : visitedUrls.entrySet()) {
 			Map.Entry pair = (Map.Entry) o;
 			url = (String) pair.getKey();
-			frequency = ((VisitedUrl) pair.getValue()).getFrequency();
-			visited.append(url, frequency);
+			visitedUrlObj = ((VisitedUrl) pair.getValue());
+			frequency = visitedUrlObj.getFrequency();
+			id = visitedUrlObj.getId();
+			if (!visitedUrlObj.isPersisted()) {
+				visitedDocs.add(new Document("_id", id).append("name", "Visited").append("URL", url).append("Frequency", frequency));
+				visitedUrlObj.setPersisted();
+			} else {
+				collection.updateOne(eq("_id", id), combine(set("Frequency", frequency)));
+			}
 		}
 
-		Document doc = new Document("name", "CrawlStatus")
-				.append("Visited", visited)
-				.append("ToVisit", urlsToVisit);
+		collection.updateOne(eq("name", "ToVisit"), new Document("$set", toVisitDoc), new UpdateOptions().upsert(true));
+		if (!visitedDocs.isEmpty())
+			collection.insertMany(visitedDocs);
 
-		collection.updateOne(eq("name", "CrawlStatus"), new Document("$set", doc), new UpdateOptions().upsert(true));
+		String word;
+		Keyword keywordObj;
+		collection = database.getCollection("Inverted_Index");
+		for (Object o : keywords.entrySet()) {
+			Map.Entry pair = (Map.Entry) o;
+			word = (String) pair.getKey();
+			keywordObj = ((Keyword) pair.getValue());
+
+			if (!keywordObj.isPersisted()) {
+				visitedDocs.add(new Document("Word", word)
+						.append("InTitle", keywordObj.getInUrlTitle())
+						.append("InHeader", keywordObj.getInUrlHeader())
+						.append("InParagraph", keywordObj.getInUrlParagraph()));
+				keywordObj.setPersisted();
+			} else {
+				collection.updateOne(eq("Word", word),
+						combine(
+								set("InTitle", keywordObj.getInUrlTitle()),
+								set("InHeader", keywordObj.getInUrlHeader()),
+								set("InParagraph", keywordObj.getInUrlParagraph())
+						));
+			}
+		}
+
+
+		if (!keywordDocs.isEmpty())
+			collection.insertMany(keywordDocs);
 	}
 
 	public void fetchDB () {
-		Document doc = collection.find(eq("name", "CrawlStatus")).first();
-		urlsToVisit = (List<String>) doc.get("ToVisit");
+		try {
+			collection = database.getCollection("Crawl_Status");
+			Document doc = collection.find(eq("name", "ToVisit")).first();
+			List<String> tmpUrlsToVisit = (List<String>) doc.get("URLs");
+
+			for (String tmpUrl : tmpUrlsToVisit) {
+				addUrlToVisit(tmpUrl);
+			}
 
 
-		Map<String,Integer> tmp = (Map<String, Integer>) doc.get("Visited");
-
-		String url;
-		int frequency;
-		for (Object o : tmp.entrySet()) {
-			Map.Entry pair = (Map.Entry) o;
-			url = (String) pair.getKey();
-			frequency = (int) pair.getValue();
-			visitedUrls.put(url, new VisitedUrl(url, frequency));
+			collection.find(eq("name", "Visited")).forEach(
+					(Block<? super Document>) document -> {
+						final String url = document.getString("URL");
+						VisitedUrl tmpUrl = visitedUrls.get(url);
+						if (tmpUrl == null)
+							visitedUrls.put(url, new VisitedUrl(url, (long) document.get("_id"), (int) document.get("Frequency"), true));
+						else {
+							tmpUrl.increment((int) document.get("Frequency"));
+							tmpUrl.setPersisted();
+						}
+					}
+			);
+		} catch (Exception e) {
+			System.err.println("Error in fetching from database");
 		}
-	}
-}
-
-class VisitedUrl {
-	private static int nextID = 0;
-	private String url;
-	private int id;
-	private int frequency;
-
-	VisitedUrl(String url) {
-		this.id = nextID ++;
-		this.frequency = 1;
-		this.url = url;
-	}
-
-	VisitedUrl(String url, int frequency) {
-		this.frequency = frequency;
-		this.url = url;
-		this.id = nextID ++;
-	}
-
-	public void increment() {
-		this.frequency++;
-	}
-
-	public int getFrequency() {
-		return frequency;
-	}
-
-	@Override
-	public int hashCode() {
-		return url.hashCode();
-	}
-
-	@Override
-	public String toString() {
-		return "{\n\tID: " + id + "\n\tURL: " + url + "\n\tFrequency: " + frequency + "\n}\n";
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj) return true;
-		if (obj == null) return false;
-		if (!(obj instanceof VisitedUrl)) return false;
-
-		final VisitedUrl other = (VisitedUrl) obj;
-		return this.url.equals(other.url);
 	}
 }
