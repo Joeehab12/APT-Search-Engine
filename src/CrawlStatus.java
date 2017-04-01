@@ -35,19 +35,15 @@ public class CrawlStatus {
 		return singleton;
 	}
 
-	public int getMaxPageLimit() {
-		return maxPageLimit;
-	}
-
 	public void setMaxPageLimit(int maxPageLimit) {
 		this.maxPageLimit = maxPageLimit;
 	}
 
 	synchronized public void addVisitedUrl(String url) {
 		VisitedUrl tmpUrl = visitedUrls.get(url);
-
 		if (tmpUrl == null) {
 			visitedUrls.put(url, new VisitedUrl(url));
+			maxPageLimit--;
 		} else tmpUrl.increment();
 	}
 
@@ -58,6 +54,13 @@ public class CrawlStatus {
 			keywords.put(word, new Keyword(word, url, position));
 		} else tmpKeyword.addReference(url, position);
 	}
+
+	public boolean stopCrawling() {
+		if (maxPageLimit <= 0)
+			return true;
+		return false;
+	}
+
 
 	public void addVisitedUrl (Set<String> visitedUrls){
 		for (String visitedUrl : visitedUrls) {
@@ -74,7 +77,18 @@ public class CrawlStatus {
 	}
 
 	synchronized public String getNextUrlToVisit() {
-		return urlsToVisit.remove(0);
+		String url = urlsToVisit.remove(0);
+		VisitedUrl tmp = visitedUrls.get(url);
+		try {
+			while (tmp != null) {
+				tmp.increment();
+				url = urlsToVisit.remove(0);
+				tmp = visitedUrls.get(url);
+			}
+		} catch (Exception e) {
+			return "";
+		}
+		return url;
 	}
 
 	public void print() {
@@ -112,60 +126,62 @@ public class CrawlStatus {
 		if (!visitedDocs.isEmpty())
 			collection.insertMany(visitedDocs);
 
-		String word;
-		Keyword keywordObj;
-		collection = database.getCollection("Inverted_Index");
-		for (Object o : keywords.entrySet()) {
-			Map.Entry pair = (Map.Entry) o;
-			word = (String) pair.getKey();
-			keywordObj = ((Keyword) pair.getValue());
-
-			if (!keywordObj.isPersisted()) {
-				visitedDocs.add(new Document("Word", word)
-						.append("InTitle", keywordObj.getInUrlTitle())
-						.append("InHeader", keywordObj.getInUrlHeader())
-						.append("InParagraph", keywordObj.getInUrlParagraph()));
-				keywordObj.setPersisted();
-			} else {
-				collection.updateOne(eq("Word", word),
-						combine(
-								set("InTitle", keywordObj.getInUrlTitle()),
-								set("InHeader", keywordObj.getInUrlHeader()),
-								set("InParagraph", keywordObj.getInUrlParagraph())
-						));
-			}
-		}
-
-
-		if (!keywordDocs.isEmpty())
-			collection.insertMany(keywordDocs);
+//		String word;
+//		Keyword keywordObj;
+//		collection = database.getCollection("Inverted_Index");
+//		for (Object o : keywords.entrySet()) {
+//			Map.Entry pair = (Map.Entry) o;
+//			word = (String) pair.getKey();
+//			keywordObj = ((Keyword) pair.getValue());
+//
+//			if (!keywordObj.isPersisted()) {
+//				visitedDocs.add(new Document("Word", word)
+//						.append("InTitle", keywordObj.getInUrlTitle())
+//						.append("InHeader", keywordObj.getInUrlHeader())
+//						.append("InParagraph", keywordObj.getInUrlParagraph()));
+//				keywordObj.setPersisted();
+//			} else {
+//				collection.updateOne(eq("Word", word),
+//						combine(
+//								set("InTitle", keywordObj.getInUrlTitle()),
+//								set("InHeader", keywordObj.getInUrlHeader()),
+//								set("InParagraph", keywordObj.getInUrlParagraph())
+//						));
+//			}
+//		}
+//
+//
+//		if (!keywordDocs.isEmpty())
+//			collection.insertMany(keywordDocs);
 	}
 
 	public void fetchDB () {
+		collection = database.getCollection("Crawl_Status");
+		Document doc = collection.find(eq("name", "ToVisit")).first();
+		List<String> tmpUrlsToVisit;
 		try {
-			collection = database.getCollection("Crawl_Status");
-			Document doc = collection.find(eq("name", "ToVisit")).first();
-			List<String> tmpUrlsToVisit = (List<String>) doc.get("URLs");
-
-			for (String tmpUrl : tmpUrlsToVisit) {
-				addUrlToVisit(tmpUrl);
-			}
-
-
-			collection.find(eq("name", "Visited")).forEach(
-					(Block<? super Document>) document -> {
-						final String url = document.getString("URL");
-						VisitedUrl tmpUrl = visitedUrls.get(url);
-						if (tmpUrl == null)
-							visitedUrls.put(url, new VisitedUrl(url, (long) document.get("_id"), (int) document.get("Frequency"), true));
-						else {
-							tmpUrl.increment((int) document.get("Frequency"));
-							tmpUrl.setPersisted();
-						}
-					}
-			);
+			tmpUrlsToVisit = (List<String>) doc.get("URLs");
 		} catch (Exception e) {
-			System.err.println("Error in fetching from database");
+			tmpUrlsToVisit = Crawler.getChildren("https://en.wikipedia.org");
 		}
+
+		for (String tmpUrl : tmpUrlsToVisit) {
+			addUrlToVisit(tmpUrl);
+		}
+
+
+		collection.find(eq("name", "Visited")).forEach(
+				(Block<? super Document>) document -> {
+					final String url = document.getString("URL");
+					VisitedUrl tmpUrl = visitedUrls.get(url);
+					if (tmpUrl == null) {
+						visitedUrls.put(url, new VisitedUrl(url, (long) document.get("_id"), (int) document.get("Frequency"), true));
+						maxPageLimit--;
+					} else {
+						tmpUrl.increment((int) document.get("Frequency"));
+						tmpUrl.setPersisted();
+					}
+				}
+		);
 	}
 }
