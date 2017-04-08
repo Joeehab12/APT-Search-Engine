@@ -85,12 +85,16 @@ public class Crawler implements Runnable{
 			Elements URLs = htmlDocument.select("a[href]");
 			List<String> children = new LinkedList<String>();
 
+			int count = 0;
 			for (Element link : URLs) {
 				String urlStr = link.attr("abs:href");
 				// check that children are non-emty and fetchable
 				if (!urlStr.equals("")&& isFetchable(urlStr) && !children.contains(urlStr)) {
 					children.add(urlStr);
 					System.out.println("Child: " + urlStr);
+					count ++;
+					if (count >= SearchEngine.numThreads)
+						return children;
 				}
 			}
 			return children;
@@ -194,9 +198,9 @@ public class Crawler implements Runnable{
 				}// Add each hyper-link to the links to visit list.
 			}
 
-			titleKeywords = Indexer.getTitleKeywords(htmlDocument);
-			paragraphKeywords = Indexer.getParagraphKeywords(htmlDocument);
-			headerKeywords = Indexer.getHeaderKeywords(htmlDocument);
+			titleKeywords = Indexer.getKeywords(htmlDocument,"title");
+			paragraphKeywords = Indexer.getKeywords(htmlDocument,"p");
+			headerKeywords = Indexer.getKeywords(htmlDocument,"h1,h2,h3,h4,h5,h6");
 			return true;
 		}
 		catch(Exception e){

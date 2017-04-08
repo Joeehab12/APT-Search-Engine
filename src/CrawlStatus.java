@@ -43,16 +43,37 @@ public class CrawlStatus {
         VisitedUrl tmpUrl = visitedUrls.get(url);
         if (tmpUrl == null) {
             visitedUrls.put(url, new VisitedUrl(url, titleKeywords, headerKeywords, paragraphKeywords));
+            addKeyword(url, titleKeywords, headerKeywords, paragraphKeywords);
             maxPageLimit--;
         } else tmpUrl.increment();
     }
 
-    synchronized public void addKeyword(String word, String url, int position) {
-        Keyword tmpKeyword = keywords.get(word);
+    synchronized public void addKeyword(String url, List<String> titleKeywords, List<String>headerKeywords, List<String>paragraphKeywords) {
+        for (String titleKeyword : titleKeywords) {
+            Keyword tmpKeyword = keywords.get(titleKeyword);
 
-        if (tmpKeyword == null) {
-            keywords.put(word, new Keyword(word, url, position));
-        } else tmpKeyword.addReference(url, position);
+            if (tmpKeyword == null) {
+                keywords.put(titleKeyword, new Keyword(titleKeyword, url, Keyword.Position.TITLE));
+            } else tmpKeyword.addReference(url, Keyword.Position.TITLE);
+        }
+
+        for (String headerKeyword : headerKeywords) {
+            Keyword tmpKeyword = keywords.get(headerKeyword);
+
+            if (tmpKeyword == null) {
+                keywords.put(headerKeyword, new Keyword(headerKeyword, url, Keyword.Position.HEADER));
+            } else tmpKeyword.addReference(url, Keyword.Position.HEADER);
+        }
+
+        for (String paragraphKeyword : paragraphKeywords) {
+            Keyword tmpKeyword = keywords.get(paragraphKeyword);
+
+            if (tmpKeyword == null) {
+                keywords.put(paragraphKeyword, new Keyword(paragraphKeyword, url, Keyword.Position.PARAGRAPH));
+            } else tmpKeyword.addReference(url, Keyword.Position.PARAGRAPH);
+        }
+
+
     }
 
     public boolean stopCrawling() {
@@ -120,33 +141,33 @@ public class CrawlStatus {
         if (!visitedDocs.isEmpty())
             collection.insertMany(visitedDocs);
 
-//		String word;
-//		Keyword keywordObj;
-//		collection = database.getCollection("Inverted_Index");
-//		for (Object o : keywords.entrySet()) {
-//			Map.Entry pair = (Map.Entry) o;
-//			word = (String) pair.getKey();
-//			keywordObj = ((Keyword) pair.getValue());
-//
-//			if (!keywordObj.isPersisted()) {
-//				visitedDocs.add(new Document("Word", word)
-//						.append("InTitle", keywordObj.getInUrlTitle())
-//						.append("InHeader", keywordObj.getInUrlHeader())
-//						.append("InParagraph", keywordObj.getInUrlParagraph()));
-//				keywordObj.setPersisted();
-//			} else {
-//				collection.updateOne(eq("Word", word),
-//						combine(
-//								set("InTitle", keywordObj.getInUrlTitle()),
-//								set("InHeader", keywordObj.getInUrlHeader()),
-//								set("InParagraph", keywordObj.getInUrlParagraph())
-//						));
-//			}
-//		}
-//
-//
-//		if (!keywordDocs.isEmpty())
-//			collection.insertMany(keywordDocs);
+		String word;
+		Keyword keywordObj;
+		collection = database.getCollection("Inverted_Index");
+		for (Object o : keywords.entrySet()) {
+			Map.Entry pair = (Map.Entry) o;
+			word = (String) pair.getKey();
+			keywordObj = ((Keyword) pair.getValue());
+
+			if (!keywordObj.isPersisted()) {
+                keywordDocs.add(new Document("Word", word)
+						.append("InTitle", keywordObj.getInUrlTitle())
+						.append("InHeader", keywordObj.getInUrlHeader())
+						.append("InParagraph", keywordObj.getInUrlParagraph()));
+				keywordObj.setPersisted();
+			} else {
+				collection.updateOne(eq("Word", word),
+						combine(
+								set("InTitle", keywordObj.getInUrlTitle()),
+								set("InHeader", keywordObj.getInUrlHeader()),
+								set("InParagraph", keywordObj.getInUrlParagraph())
+						));
+			}
+		}
+
+
+		if (!keywordDocs.isEmpty())
+			collection.insertMany(keywordDocs);
     }
 
     public void fetchDB() {

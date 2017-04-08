@@ -18,28 +18,34 @@ import static com.mongodb.client.model.Filters.eq;
  */
 
 public class Keyword {
+    static public enum Position {
+        TITLE,
+        HEADER,
+        PARAGRAPH
+    }
     private String word;
     private boolean persisted = false;
     private List<String> inUrlTitle = new LinkedList<>(),
             inUrlHeader =  new LinkedList<>(),
             inUrlParagraph = new LinkedList<>();
 
-    public Keyword(String word, String url, int position) {
+    public Keyword(String word, String url, Position position) {
         this.word = word;
         addReference(url, position);
     }
 
-    public void addReference(String url, int position) {
-        if (position >= 5) {
-            inUrlTitle.add(url);
-            position -= 5;
+    public void addReference(String url, Position position) {
+        switch (position) {
+            case TITLE:
+                inUrlTitle.add(url);
+                break;
+            case HEADER:
+                inUrlHeader.add(url);
+                break;
+            case PARAGRAPH:
+                inUrlParagraph.add(url);
+                break;
         }
-        if (position >= 3) {
-            inUrlHeader.add(url);
-            position -= 3;
-        }
-        if (position == 1)
-            inUrlParagraph.add(url);
     }
 
     public boolean isPersisted() {

@@ -11,13 +11,16 @@ import java.util.List;
  * @since 01/4/2017
  */
 public class SearchEngine {
+    static public int numThreads;
     public static void main(String[] args) throws Exception{
-        CrawlStatus crawlStatus = CrawlStatus.getInstance();
-        crawlStatus.setMaxPageLimit(10);
-        crawlStatus.fetchDB();
         BufferedReader consoleReader = new BufferedReader (new InputStreamReader(System.in));
         System.out.println("Enter the number of crawling threads: ");
-        int numThreads = Integer.parseInt(consoleReader.readLine());
+        numThreads = Integer.parseInt(consoleReader.readLine());
+
+        CrawlStatus crawlStatus = CrawlStatus.getInstance();
+        crawlStatus.setMaxPageLimit(10);
+
+        crawlStatus.fetchDB();
 
         // list to reference threads
         List<Thread> threads = new LinkedList<>();
