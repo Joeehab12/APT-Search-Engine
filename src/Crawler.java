@@ -5,6 +5,9 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import opennlp.tools.stemmer.snowball.*;
+import opennlp.tools.stemmer.snowball.SnowballStemmer.ALGORITHM;
+
 import org.apache.commons.io.FileUtils;
 /**
  * Crawler.java
@@ -13,15 +16,28 @@ import org.apache.commons.io.FileUtils;
  * @author Abdallah Sobehy, Mostafa Fateen, Youssef Ehab
  * @version 1.0 5/3/2017
  */
+
+
+
+
 public class Crawler implements Runnable{
 	// A list of links to be visited
 	private List<String> urlsToVisit = new LinkedList<String>();
+	
+	private static Vector<Map<String,Vector<String>>> paragraphsMap = new Vector<Map<String,Vector<String>>>();
+	
+	private static Vector<Map<String,Vector<String>>> headersMap = new Vector<Map<String,Vector<String>>>();
+
+	private static Vector<Map<String,Vector<String>>> titlesMap = new Vector<Map<String,Vector<String>>>();
+	
 	// The set of links that were visited, used to avoid visiting the same link twice.
 	private static Set<String> visitedUrls = new HashSet<String>();
+	
 	// Limit where crawler will stop crawling otherwise it will crawl infinitely
 	private int maxPageLimit;
 	// Seed from which other links are extracted
 	private String seed;
+	
 	// User Agent to make web crawler conform to robot exclusion standard.
 	private static final String USER_AGENT =
 			"Mozilla/5.0 (Windows NT 6.1; WOW64)"
@@ -76,8 +92,9 @@ public class Crawler implements Runnable{
 			for (Element link : URLs) {
 				String urlStr = link.attr("abs:href");
 				// check that children are non-emty and fetchable
-				if (!urlStr.equals("")&& isFetchable(urlStr)) {
+				if (!urlStr.equals("")&& isFetchable(urlStr) && !children.contains(urlStr)) {
 					children.add(urlStr);
+					System.out.println("Child: " + urlStr);
 					count ++;
 					if(count == numChildren)
 						return children;
@@ -136,15 +153,84 @@ public class Crawler implements Runnable{
 				return false;
 			}
 			Elements URLs = htmlDocument.select("a[href]");
+			System.out.println("This is location:" + htmlDocument.location());
+			/*
+			StringTokenizer st;
+			String delimiters = "[ \n\r.,_(){}-?!|&$\"+*-/\t]";
+			String title = htmlDocument.select("title").text();
+			Vector<String> titleKeywords = new Vector<String>(0);
+			st = new StringTokenizer(title,delimiters,false);
+			
+			while(st.hasMoreTokens()){
+				String s = st.nextToken();
+				if (s!= "" && s!= " "){
+				titleKeywords.add(s);
+				}
+			}
+			
+			
+			Elements headers = htmlDocument.select("h1,h2,h3,h4,h5,h6");
+			
+			Elements paragraphs = htmlDocument.select("p");
+			
+			Map <String,Vector<String>> urlMap;
+			Vector<String> totalKeywords = new Vector<String>(0);
+			totalKeywords.addAll(titleKeywords);
+			Vector<String> headerKeywords = new Vector<String>(0);
+			Vector<String> paragraphKeywords = new Vector<String>(0);
+			for (Element header : headers){
+				String headerText = header.text();
+				st = new StringTokenizer(headerText,delimiters,false);
+				while(st.hasMoreTokens()){
+					String s = st.nextToken();
+					if (s!= "" && s!= " "){
+					headerKeywords.add(s);
+					}
+				}
+			}
+			
+			for (Element paragraph : paragraphs){
+				String paragraphText = paragraph.text();
+				st = new StringTokenizer(paragraphText,delimiters,false);
+				while(st.hasMoreTokens()){
+					String s = st.nextToken();
+					if (s!= "" && s!= " "){
+					paragraphKeywords.add(s);
+					}
+				}
+			}
+			totalKeywords.addAll(headerKeywords);
+			totalKeywords.addAll(paragraphKeywords);
+			*/
 			// get all hyper-links found on the given URL.
 			int fileNum = 0;
 			//System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
 			for (Element link : URLs){
 				if(!link.attr("abs:href").equals("")){ // making sure it is not an empty string
 					urlsToVisit.add(link.attr("abs:href"));
+					
 				}// Add each hyper-link to the links to visit list.
+				
 				fileNum++;
 			}
+			
+			Vector<String> titleKeywords = Indexer.getTitleKeywords(htmlDocument);
+			Vector<String> paragraphKeywords = Indexer.getParagraphKeywords(htmlDocument);
+			Vector<String> headerKeywords = Indexer.getHeaderKeywords(htmlDocument);
+			
+			
+			Map<String,Vector<String>> titleMap = new HashMap<String, Vector<String>>(0);
+			titleMap.put(URL, titleKeywords);
+			titlesMap.add(titleMap);
+			
+			Map<String,Vector<String>> paragraphMap = new HashMap<String, Vector<String>>(0);
+			paragraphMap.put(URL, paragraphKeywords);
+			paragraphsMap.add(paragraphMap);
+			
+			Map<String,Vector<String>> headerMap = new HashMap<String, Vector<String>>(0);
+			headerMap.put(URL, headerKeywords);
+			headersMap.add(headerMap);
+			
 			return true;
 		}
 		catch(Exception e){
@@ -152,6 +238,20 @@ public class Crawler implements Runnable{
 			return false;
 		}
 	}
+	
+	/*public void getUrlsContainingWord(String word){
+		Map<String,Vector<String>> mp;
+		Set<String> set;
+		for (int i = 0;i<urlsMap.size();i++){
+			mp = urlsMap.get(i);
+			set = mp.keySet();
+		}
+	}
+	*/
+	
+	
+	
+	
 	/**
 	 * starts with a link, crawls and gets included hyper-links and repeats the same process
 	 * for each hyper-link until the maximum page limit is reached.
@@ -176,13 +276,14 @@ public class Crawler implements Runnable{
 		BufferedReader consoleReader = new BufferedReader (new InputStreamReader(System.in));
 		System.out.println("Enter the number of crawling threads: ");
 		int numThreads = Integer.parseInt(consoleReader.readLine());
-		String seed = "https://www.wikipedia.org";
+		String seed = "https://sethgodin.typepad.com/";
+		int maxPages = 1;
 		List<String> threadsSeeds = getChildren(seed,numThreads);
 		// list to reference threads
 		List<Thread> threads = new LinkedList<Thread>();
 		// maximum number of threads upper limit is the number of children in the Seed
 		for (int i=0 ; i < threadsSeeds.size() ; i++) {
-			threads.add(new Thread(new Crawler(threadsSeeds.get(i), 10, visitedUrls)));
+			threads.add(new Thread(new Crawler(threadsSeeds.get(i), maxPages, visitedUrls)));
 			threads.get(i).start();
 		}
 		for (int i=0 ; i < numThreads ; i++) {
@@ -193,5 +294,46 @@ public class Crawler implements Runnable{
 		for(String url : visitedUrls) {
 			System.out.println(count++ + "- " + url);
 		}
+		Vector<String> urlKeywords = new Vector<String>();
+		
+		int index1 = 0;
+		int index2 = 0;
+		
+		
+		for (Map <String,Vector<String>> mp: titlesMap){
+			urlKeywords = mp.get(threadsSeeds.get(index1));
+			for (String keyword: urlKeywords){
+				//System.out.println("Title " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
+				index2++;
+			}
+			index2 = 0;
+			index1++;
+		}
+		
+		
+		index1 =0;
+		index2 = 0;
+		
+		for (Map <String,Vector<String>> mp: headersMap){
+			urlKeywords = mp.get(threadsSeeds.get(index1));
+			for (String keyword: urlKeywords){
+				System.out.println("Header " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
+				index2++;
+			}
+			index2 = 0;
+			index1++;
+		}
+		index1 = 0;
+		index2 = 0;
+		for (Map <String,Vector<String>> mp: paragraphsMap){
+			urlKeywords = mp.get(threadsSeeds.get(index1));
+			for (String keyword: urlKeywords){
+				//System.out.println("Paragraph " + threadsSeeds.get(index1) +"keyword "+ index2 + ":" + keyword);
+				index2++;
+			}
+			index2 = 0;
+			index1++;
+		}
+		
 	}
 }
