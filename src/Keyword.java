@@ -18,7 +18,7 @@ import static com.mongodb.client.model.Filters.eq;
  */
 
 public class Keyword {
-    static public enum Position {
+    public enum Position {
         TITLE,
         HEADER,
         PARAGRAPH

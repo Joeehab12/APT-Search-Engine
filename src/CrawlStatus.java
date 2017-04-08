@@ -88,7 +88,7 @@ public class CrawlStatus {
             urlsToVisit.add(url);
         else
             tmp.increment();
-    }
+}
 
     synchronized public String getNextUrlToVisit() {
         String url = urlsToVisit.remove(0);
