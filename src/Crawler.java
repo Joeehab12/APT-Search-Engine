@@ -1,16 +1,10 @@
 import java.util.*;
-import java.io.*;
 import crawlercommons.robots.*;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.util.*;
-import org.apache.commons.io.FileUtils;
 import java.net.URL;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.HttpGet;
@@ -49,7 +43,6 @@ public class Crawler implements Runnable{
 
 	public Crawler(){}
 
-
 	/**
 	 * run method for crawing threads
 	 */
@@ -83,17 +76,14 @@ public class Crawler implements Runnable{
 				return null;
 			}
 			Elements URLs = htmlDocument.select("a[href]");
-			List<String> children = new LinkedList<String>();
-
-			int count = 0;
+			List<String> children = new LinkedList<>();
 			for (Element link : URLs) {
-				String urlStr = link.attr("abs:href");
-				// check that children are non-emty and fetchable
-				if (!urlStr.equals("")&& isFetchable(urlStr) && !children.contains(urlStr)) {
+				String urlStr = link.attr("abs:href").split("#")[0];
+				// check that children are non-empty and fetchable
+				if (!urlStr.equals("") && !children.contains(urlStr) && isFetchable(urlStr)) {
 					children.add(urlStr);
 					System.out.println("Child: " + urlStr);
-					count ++;
-					if (count >= SearchEngine.numThreads)
+					if (children.size() >= SearchEngine.numThreads)
 						return children;
 				}
 			}
@@ -191,10 +181,13 @@ public class Crawler implements Runnable{
 			// get all hyper-links found on the given URL.
 			//System.out.print(String.format("The page: %s contains %d links\n" ,URL,URLs.size()));
 			String childUrl;
+			// avoids false increase in ranker score by linking the same page multiple times from one other page
+			HashSet<String> tmpHashSet = new HashSet<>();
 			for (Element link : URLs){
-				childUrl = link.attr("abs:href");
-				if(!childUrl.equals("")){ // making sure it is not an empty string
+				childUrl = link.attr("abs:href").split("#")[0];
+				if(!childUrl.equals("") && !tmpHashSet.contains(childUrl)){ // making sure it is not an empty string
 					crawlStatus.addUrlToVisit(childUrl);
+					tmpHashSet.add(childUrl);
 				}// Add each hyper-link to the links to visit list.
 			}
 

@@ -26,7 +26,7 @@ public class Indexer {
 	 */
 	public static Vector<String> getKeywords(Document htmlDocument, String tag) {
 		StringTokenizer stringTokenizer;
-		String delimiters = "[ '\n\r.,_(){}-?!|&$\"+-*/\t]";
+		String delimiters = "[ '\n\r.:,_(){}-?!|&$\"+-*/\t]";
 		String title = htmlDocument.select(tag).text();
 		Vector<String> keyWords = new Vector<>(0);
 		stringTokenizer = new StringTokenizer(title, delimiters, false);

@@ -17,6 +17,8 @@ public class SearchEngine {
         System.out.println("Enter the number of crawling threads: ");
         numThreads = Integer.parseInt(consoleReader.readLine());
 
+        long startTime = System.currentTimeMillis();
+
         CrawlStatus crawlStatus = CrawlStatus.getInstance();
         crawlStatus.setMaxPageLimit(10);
 
@@ -34,5 +36,7 @@ public class SearchEngine {
         }
 
         crawlStatus.persistDB();
+        long endTime = System.currentTimeMillis();
+        System.out.println("Elapsed time: "+(endTime - startTime) + " ms");
     }
 }
