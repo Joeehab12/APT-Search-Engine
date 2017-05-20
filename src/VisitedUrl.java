@@ -23,6 +23,19 @@ public class VisitedUrl {
 
     private long id;
     private boolean persisted = false;
+
+    public List<String> getTitleKeywords() {
+        return titleKeywords;
+    }
+
+    public List<String> getHeaderKeywords() {
+        return headerKeywords;
+    }
+
+    public List<String> getParagraphKeywords() {
+        return paragraphKeywords;
+    }
+
     private List<String> titleKeywords, headerKeywords, paragraphKeywords;
 
     VisitedUrl(String url, List<String> titleKeywords, List<String>headerKeywords, List<String>paragraphKeywords) {
@@ -34,11 +47,10 @@ public class VisitedUrl {
         this.paragraphKeywords = paragraphKeywords;
     }
 
-    VisitedUrl(String url, long id, int frequency, boolean persisted) {
+    VisitedUrl(String url, int frequency, boolean persisted) {
         this.frequency = frequency;
         this.url = url;
         this.persisted = persisted;
-        this.id = id;
     }
 
     public void increment() { this.frequency++; }

@@ -1,5 +1,6 @@
 import com.mongodb.Block;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoClientOptions;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.UpdateOptions;
@@ -19,6 +20,7 @@ public class CrawlStatus {
     private static Map<String, VisitedUrl> visitedUrls;
     private static Map<String, Keyword> keywords;
     private MongoCollection<Document> collection;
+    private MongoClient mongoClient;
     MongoDatabase database;
     private int maxPageLimit;
 
@@ -27,7 +29,12 @@ public class CrawlStatus {
         visitedUrls = new HashMap<>();
         keywords = new HashMap<>();
 
-        MongoClient mongoClient = new MongoClient();
+
+        MongoClientOptions.Builder builder = new MongoClientOptions.Builder();
+        builder.maxConnectionIdleTime(1000000000);
+        MongoClientOptions opts = builder.build();
+
+        mongoClient = new MongoClient("localhost", opts);
         database = mongoClient.getDatabase("APT_Search_Engine");
     }
 
@@ -45,6 +52,9 @@ public class CrawlStatus {
             visitedUrls.put(url, new VisitedUrl(url, titleKeywords, headerKeywords, paragraphKeywords));
             addKeyword(url, titleKeywords, headerKeywords, paragraphKeywords);
             maxPageLimit--;
+            if(maxPageLimit%50 == 0)
+                this.persistDB();
+            System.out.println("Remaining number of pages: " + maxPageLimit);
         } else tmpUrl.increment();
     }
 
@@ -127,13 +137,14 @@ public class CrawlStatus {
             url = (String) pair.getKey();
             visitedUrlObj = ((VisitedUrl) pair.getValue());
             frequency = visitedUrlObj.getFrequency();
-            id = visitedUrlObj.getId();
             if (!visitedUrlObj.isPersisted()) {
-                visitedDocs.add(new Document("_id", id).append("name", "Visited").append("URL", url).append("Frequency", frequency));
+                visitedDocs.add(new Document("name", "Visited").append("URL", url).append("Frequency", frequency).append("InTitle", visitedUrlObj.getTitleKeywords())
+                        .append("InHeader", visitedUrlObj.getHeaderKeywords())
+                        .append("InParagraph", visitedUrlObj.getParagraphKeywords()));
                 visitedUrlObj.setPersisted();
                 visitedUrlObj.persistURL();
             } else {
-                collection.updateOne(eq("_id", id), combine(set("Frequency", frequency)));
+                collection.updateOne(eq("URL", url), combine(set("Frequency", frequency)));
             }
         }
 
@@ -190,7 +201,7 @@ public class CrawlStatus {
                     final String url = document.getString("URL");
                     VisitedUrl tmpUrl = visitedUrls.get(url);
                     if (tmpUrl == null) {
-                        visitedUrls.put(url, new VisitedUrl(url, (long) document.get("_id"), (int) document.get("Frequency"), true));
+                        visitedUrls.put(url, new VisitedUrl(url, (int) document.get("Frequency"), true));
                         maxPageLimit--;
                     } else {
                         tmpUrl.increment((int) document.get("Frequency"));

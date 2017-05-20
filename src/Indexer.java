@@ -45,6 +45,6 @@ public class Indexer {
 	 */
 	static boolean isAccepted(String word)
 	{
-		return !(stopWordList.contains(word) || word.length() == 1);
+		return !(stopWordList.contains(word) || word.length() <= 1);
 	}
 }

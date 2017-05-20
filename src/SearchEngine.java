@@ -20,7 +20,7 @@ public class SearchEngine {
         long startTime = System.currentTimeMillis();
 
         CrawlStatus crawlStatus = CrawlStatus.getInstance();
-        crawlStatus.setMaxPageLimit(10);
+        crawlStatus.setMaxPageLimit(300);
 
         crawlStatus.fetchDB();
 
