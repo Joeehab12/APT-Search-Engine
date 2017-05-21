@@ -14,6 +14,7 @@ import static com.mongodb.client.model.Filters.eq;
  *
  * @author Mostafa Fateen
  * @version 1.0
+ * @ref http://www.java2novice.com/java-interview-programs/sort-a-map-by-value/
  * @since 08/4/2017
  */
 public class QueryProcessor {
@@ -26,6 +27,11 @@ public class QueryProcessor {
         this.indexCollection = database.getCollection("Crawl_Status");
     }
 
+    void printList (List<String> l){
+        for(String s : l){
+            System.out.println(s);
+        }
+    }
     /**
      * returns list of urls containing the word
      * @param word the word used to look up urls
@@ -42,29 +48,56 @@ public class QueryProcessor {
         SnowballStemmer stemmer = new SnowballStemmer(SnowballStemmer.ALGORITHM.ENGLISH);
         word = word.toLowerCase();
         word = (String) stemmer.stem(word);
+        //System.out.println("query Word -> " + word + " , tag : " +  tag);
 
         Document document = invertedIndexCollection.find(eq("Word", word)).first();
 
-        titleUrls.addAll((List<String>) document.get("InTitle"));
-        headUrls.addAll((List<String>) document.get("InHeader"));
-        parUrls.addAll((List<String>) document.get("InParagraph"));
+        //System.out.println("query 2.");
 
+        titleUrls.addAll((List<String>) document.get("InTitle"));
+        //System.out.println("title size before set : " + titleUrls.size());
+        Set<String> urlSet = new HashSet<>();
+        urlSet.addAll(titleUrls);
+        titleUrls.clear();
+        titleUrls.addAll(urlSet);
+        //System.out.println("title size after set : " + titleUrls.size());
         titleUrls = sortUrls(titleUrls);
-        headUrls = sortUrls(titleUrls);
+        //System.out.println("title size after sort : " + titleUrls.size());
+        if(tag.equals("title"))
+            return titleUrls;
+
+
+        headUrls.addAll((List<String>) document.get("InHeader"));
+        //System.out.println("headerurl size before set : " + headUrls.size());
+        urlSet = new HashSet<>();
+        urlSet.addAll(headUrls);
+        headUrls.clear();
+        headUrls.addAll(urlSet);
+        //System.out.println("headerurl size before set : " + headUrls.size());
+        //printList(headUrls);
+        headUrls = sortUrls(headUrls);
+        //System.out.println("headerurl size after sort : " + headUrls.size());
+        //printList(headUrls);
+        if(tag.equals("header"))
+            return headUrls;
+
+
+        parUrls.addAll((List<String>) document.get("InParagraph"));
+        //System.out.println("par size before set : " + parUrls.size());
+        urlSet = new HashSet<>();
+        urlSet.addAll(parUrls);
+        parUrls.clear();
+        parUrls.addAll(urlSet);
+        //System.out.println("par size after set : " + parUrls.size());
         parUrls = sortUrls(parUrls);
+        //System.out.println("par size after sort : " + parUrls.size());
+        if(tag.equals("paragraph"))
+            return parUrls;
 
         Result.addAll(titleUrls);
         Result.addAll(headUrls);
         Result.addAll(parUrls);
-
-        if(tag.equals("title"))
-            return titleUrls;
-        else if(tag.equals("header"))
-            return headUrls;
-        else if(tag.equals("paragraph"))
-            return parUrls;
-        else
-            return Result;
+        return Result;
     }
 
     /**
@@ -74,11 +107,12 @@ public class QueryProcessor {
      * @param tag the html tag for which the url words are to be fetched
      */
     void quotePhraseFilter(List<String> urls , List<String> phraseWords, String tag ){
-
+        //System.out.println("Filtering : " + tag);
         for(int i = 0; i < urls.size(); i++) {
             boolean urlAccepted = false;
             Document urlWordsDoc = indexCollection.find(eq("URL", urls.get(i))).first();
             List<String> urlWords = (List<String>) urlWordsDoc.get(tag);
+            //System.out.println("url: "+ urls.get(i) + "Num words : " + urlWords.size() + " Tag: " + tag );
             String firstWord = phraseWords.get(0);
             for (int j = 0; j < urlWords.size(); j++) {
                 if (firstWord.equals(urlWords.get(j))) {
@@ -101,41 +135,35 @@ public class QueryProcessor {
         }
     }
 
+    List<String> orderByValue(HashMap<String, Integer> map){
+        Set<Map.Entry<String, Integer>> set = map.entrySet();
+        List<String> result = new LinkedList<>();
+        List<Map.Entry<String, Integer>> list = new ArrayList<Map.Entry<String, Integer>>(set);
+        Collections.sort( list, new Comparator<Map.Entry<String, Integer>>()
+        {
+            public int compare( Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2 )
+            {
+                return (o2.getValue()).compareTo( o1.getValue() );
+            }
+        } );
+        for(Map.Entry<String, Integer> entry:list){
+            //System.out.println(entry.getKey()+" ==== "+entry.getValue());
+            result.add(entry.getKey());
+        }
+        return result;
+    }
+
     List<String> sortUrls(List<String> urls){
 
-        List <String> orderedUrls =  new LinkedList<>();
-        List<Integer> frequencies = new LinkedList<>();
+        //System.out.println("Sorting !!");
+        HashMap<String, Integer> freqMap = new HashMap<>();
         int freq;
-        for(String url : urls){
+        for(String url : urls) {
             Document urlDoc = indexCollection.find(eq("URL", url)).first();
             freq = (int) urlDoc.get("Frequency");
-            if(frequencies.size() == 0)
-            {
-                frequencies.add(freq);
-                orderedUrls.add(url);
-                continue;
-            }
-            int i;
-            boolean insertedMiddle = false;
-            for(i = 0 ; i < frequencies.size() ; i++){
-                if(freq > frequencies.get(i)){
-                    frequencies.add(frequencies.get(frequencies.size()-1));
-                    orderedUrls.add(orderedUrls.get(orderedUrls.size()-1));
-                    for( int j = frequencies.size()-1 ; j > i ; j--){
-                        frequencies.set(j, frequencies.get(j-1));
-                        orderedUrls.set(j, orderedUrls.get(j-1));
-                    }
-                    frequencies.set(i, freq);
-                    orderedUrls.set(i, url);
-                    insertedMiddle = true;
-                }
-            }
-            if(!insertedMiddle){
-                frequencies.add(freq);
-                orderedUrls.add(url);
-            }
+            freqMap.put(url, freq);
         }
-        return  orderedUrls;
+        return orderByValue(freqMap);
     }
 
     /**
